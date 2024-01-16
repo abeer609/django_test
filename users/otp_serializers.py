@@ -1,12 +1,10 @@
-import datetime
-from django.conf import settings
 from django.contrib.auth.models import update_last_login
-from pytz import utc
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from users.models import User
+from .utils import OTPServices
 
 
 class AuthEmailSerializer(serializers.Serializer):
@@ -20,25 +18,29 @@ class AuthEmailSerializer(serializers.Serializer):
         return email
 
 
-class AuthOTPVerifySerializer(AuthEmailSerializer):
+class AuthOTPSerializer(AuthEmailSerializer):
     otp = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        try:
-            user = User.objects.get(**attrs)
-        except User.DoesNotExist:
+        valid = OTPServices.validate_otp(**attrs)
+
+        if not valid:
             raise AuthenticationFailed("OTP verification failed")
-        now = datetime.datetime.utcnow().replace(tzinfo=utc)
-        will_expire = user.otp_created + datetime.timedelta(
-            seconds=settings.OTP_LIFESPAN
-        )
-        expired = will_expire <= now
-        if expired:
-            raise AuthenticationFailed("OTP has expired")
         return attrs
+        # try:
+        #     user = User.objects.get(**attrs)
+        # except User.DoesNotExist:
+        #     raise AuthenticationFailed("OTP verification failed")
+        # now = datetime.datetime.utcnow().replace(tzinfo=utc)
+        # will_expire = user.otp_created + datetime.timedelta(
+        #     seconds=settings.OTP_LIFESPAN
+        # )
+        # expired = will_expire <= now
+        # if expired:
+        #     raise AuthenticationFailed("OTP has expired")
 
 
-class TokenObtainSerializer(AuthOTPVerifySerializer):
+class TokenObtainSerializer(AuthOTPSerializer):
     @classmethod
     def get_token(cls, user):
         return cls.token_class.for_user(user)

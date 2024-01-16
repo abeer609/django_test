@@ -10,7 +10,7 @@ from django.utils.module_loading import import_string
 
 
 from .otp_serializers import (
-    AuthOTPVerifySerializer,
+    AuthOTPSerializer,
     LoginSerializer,
     ResendOTPSerializer,
 )
@@ -68,21 +68,23 @@ class UserViewSet(ModelViewSet):
         return SimpleUserSerializer
 
 
-class LoginView(GenericAPIView, OTPServices):
+class LoginView(GenericAPIView):
     """
     Takes an email and send OTP. User can't login into their account without activating their account. To activate account use /auth/admin/activate/ endpoint
     """
 
+    permission_classes = ()
+    authentication_classes = ()
     serializer_class = LoginSerializer
 
     def post(self, request, format=None):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = User.objects.get(email=serializer.validated_data.get("email"))
-        otp = self.generate_otp()
-        user.otp = otp
-        user.save()
-        self.send_otp(user.email, user.otp)
+        email = serializer.validated_data.get("email")
+        otp = OTPServices.generate_otp(email)
+        # user.otp = otp
+        # user.save()
+        OTPServices.send_otp(email, otp)
         return Response({"message": "an OTP has sent to your your email"})
 
 
@@ -109,28 +111,27 @@ class VerifyOTPView(VerifyOTPBase):
         return Response(response, status=status.HTTP_200_OK)
 
 
-class RegisterAdmin(GenericAPIView, OTPServices):
+class RegisterAdmin(GenericAPIView):
+    permission_classes = ()
+    authentication_classes = ()
     serializer_class = None
     user_model = None
-
-    # def generate_username(self):
-    #     return f"admin_{nanoid.generate(size=12)}"
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # creating admin user. username is set to given email and password is set to unusable password.
+        # creating admin user. username is set to given email. Password is set to unusable password.
         # https://docs.djangoproject.com/en/5.0/ref/contrib/auth/#django.contrib.auth.models.UserManager
 
-        user = self.user_model.objects.create_user(
-            **serializer.validated_data,
+        email = serializer.validated_data.get("email")
+        self.user_model.objects.create_user(
+            email=email,
             username=serializer.validated_data.get("email"),
             is_admin=True,
-            otp=self.generate_otp(),
         )
-
-        self.send_otp(user.email, user.otp)
+        otp = OTPServices.generate_otp(email)
+        OTPServices.send_otp(email, otp)
         return Response({"message": "an OTP has sent to your your email"})
 
 
@@ -163,7 +164,7 @@ class ActivateAdminView(GenericAPIView):
     Takes email and OTP code and activate admin account.
     """
 
-    serializer_class = AuthOTPVerifySerializer
+    serializer_class = AuthOTPSerializer
     permission_classes = ()
     authentication_classes = ()
 
@@ -171,7 +172,6 @@ class ActivateAdminView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data.get("email")
-        print(email)
         user = User.objects.get(email=email)
         if not user.is_active:
             user.is_active = True
@@ -183,15 +183,15 @@ class ActivateAdminView(GenericAPIView):
         )
 
 
-class ResendOTPView(GenericAPIView, OTPServices):
+class ResendOTPView(GenericAPIView):
     serializer_class = ResendOTPSerializer
+    permission_classes = ()
+    authentication_classes = ()
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = User.objects.get(email=serializer.validated_data["email"])
-        otp = self.generate_otp()
-        user.otp = otp
-        user.save()
-        self.send_otp(user.email, user.otp)
+        email = serializer.validated_data.get("email")
+        otp = OTPServices.generate_otp(email)
+        OTPServices.send_otp(email, otp)
         return Response({"message": "an OTP has sent to your your email"})

@@ -22,7 +22,7 @@ router.register("users", UserViewSet, "my-users")
 
 urlpatterns = [
     path("auth/admin/register/", AdminRegistrationView.as_view()),
-    path("auth/admin/verify/", VerifyAdminRegistrationOTPView.as_view()),
+    path("auth/admin/otp/verify/", VerifyAdminRegistrationOTPView.as_view()),
     path("auth/admin/activate/", ActivateAdminView.as_view()),
     path("auth/admin/login/", LoginView.as_view()),
     path("auth/otp/resend/", ResendOTPView.as_view()),
